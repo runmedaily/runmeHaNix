@@ -1,0 +1,8 @@
+result
+result-*
+*.iso
+test-disk.qcow2
+*.qcow2
+.DS_Store
+.env
+*.log
