@@ -1,56 +1,64 @@
 # runmeHaNix
 
-Public-safe NixOS bootstrap ISO for a Home Assistant + Node-RED + Homebridge stack.
+![Build ISO](https://github.com/runmedaily/runmeHaNix/actions/workflows/build-iso.yml/badge.svg)
 
-No SSH keys, deploy keys, or Tailscale auth keys are baked into the ISO.
+A public-safe NixOS bootstrap ISO for a Home Assistant stack:
 
-## Build
+- Home Assistant
+- Node-RED
+- Homebridge
+- Avahi / mDNS
+- native NixOS Tailscale
+
+Built for livestream testing and public feedback.
+
+## Safety promise
+
+The ISO contains **no baked secrets**:
+
+- no SSH private keys
+- no deploy keys
+- no Tailscale auth keys
+- no private host configs
+- no Forgejo or 1Password wiring
+
+During install, you add your own SSH public key and optionally your own Tailscale auth key.
+
+## Fastest path: download the ISO
+
+Open:
+
+https://github.com/runmedaily/runmeHaNix/actions/workflows/build-iso.yml
+
+Then:
+
+1. Open the latest successful **Build ISO** run.
+2. Download the artifact named `runmeHaNix-iso`.
+3. Unzip it.
+4. Write the `.iso` to USB.
+
+The current artifact is large, about 1.4 GB.
+
+## Build it yourself
 
 On Linux/NixOS:
 
 ```bash
+git clone https://github.com/runmedaily/runmeHaNix
+cd runmeHaNix
 make public-check
 make build-minimal
 ```
 
-The ISO appears under `result/iso/`.
-
-On macOS, run checks locally but build the ISO with GitHub Actions unless you
-have a configured Linux builder:
+On macOS:
 
 ```bash
+git clone https://github.com/runmedaily/runmeHaNix
+cd runmeHaNix
 make public-check
 ```
 
-Then open GitHub → Actions → "Build ISO" → Run workflow. Download the
-`runmeHaNix-iso` artifact when the workflow completes.
-
-## Test in QEMU
-
-```bash
-make test-minimal
-```
-
-## Install flow
-
-The installer asks for:
-
-- disk
-- hostname
-- username, default `hanix-user`
-- SSH public key source
-  - GitHub username lookup is recommended
-  - manual paste is available
-  - file import is available
-- optional Tailscale auth key, entered silently
-
-GitHub username lookup fetches public keys from:
-
-```text
-https://github.com/<username>.keys
-```
-
-No GitHub login or token is needed.
+Then use GitHub Actions to build the ISO, unless your Mac has a configured Linux builder.
 
 ## Write USB
 
@@ -60,10 +68,70 @@ Linux or macOS:
 make write-usb
 ```
 
-Build then write:
+Build and then write on Linux/NixOS:
 
 ```bash
 make build-and-write-usb
 ```
 
-The script shows disks and requires explicit confirmation before writing.
+The writer lists disks and requires explicit confirmation before erasing anything.
+
+## Installer flow
+
+The installer asks for:
+
+- target disk
+- hostname
+- username, default `hanix-user`
+- SSH public key source
+- optional Tailscale auth key
+
+Recommended SSH key path:
+
+1. Add your SSH public key to GitHub.
+2. In the installer, choose GitHub username lookup.
+3. Type your GitHub username.
+
+The installer fetches public keys from:
+
+```text
+https://github.com/<username>.keys
+```
+
+No GitHub login, password, token, or private key is needed.
+
+Tailscale auth-key input is hidden so it is safe for livestreams and recordings.
+
+## Test in QEMU
+
+On a Linux/NixOS machine with QEMU:
+
+```bash
+make test-minimal
+```
+
+## Repo layout
+
+```text
+flake.nix                  public flake: ISO, modules, demo config
+iso.nix                    live ISO config
+installer/install.sh       bootstrap installer
+scripts/write-usb.sh       Linux/macOS USB writer
+modules/roles/             Home Assistant stack roles
+templates/host/            example public host template
+.github/workflows/         GitHub Actions ISO build
+```
+
+## Public check
+
+Before pushing changes:
+
+```bash
+make public-check
+```
+
+This checks for private-looking strings, suspicious tracked files, Bash syntax, and Nix eval.
+
+## Status
+
+First public iteration. Expect rough edges; feedback is welcome.
