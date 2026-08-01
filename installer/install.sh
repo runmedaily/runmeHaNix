@@ -450,13 +450,24 @@ generate_config() {
   local module_imports=""
   local module_enables=""
   local user_shell="pkgs.bash"
+  local user_extra_groups='[ "wheel" "networkmanager" ]'
+  local needs_docker=false
   local module
   for module in "${SELECTED_MODULES[@]}"; do
     module_imports+="        runmeHaNix.nixosModules.${module}\n"
     case "$module" in
-      home-assistant) module_enables+="  services.runme.home-assistant.enable = true;\n" ;;
-      node-red) module_enables+="  services.runme.node-red.enable = true;\n" ;;
-      homebridge) module_enables+="  services.runme.homebridge.enable = true;\n" ;;
+      home-assistant)
+        module_enables+="  services.runme.home-assistant.enable = true;\n"
+        needs_docker=true
+        ;;
+      node-red)
+        module_enables+="  services.runme.node-red.enable = true;\n"
+        needs_docker=true
+        ;;
+      homebridge)
+        module_enables+="  services.runme.homebridge.enable = true;\n"
+        needs_docker=true
+        ;;
       avahi) module_enables+="  services.runme.avahi.enable = true;\n" ;;
       shell-environment)
         module_enables+="  services.runme.shell.enable = true;\n"
@@ -464,6 +475,10 @@ generate_config() {
         ;;
     esac
   done
+
+  if [[ "$needs_docker" == true ]]; then
+    user_extra_groups='[ "wheel" "networkmanager" "docker" ]'
+  fi
 
   local tailscale_auth_block=""
   if [[ -n "$TS_AUTHKEY" ]]; then
@@ -562,7 +577,7 @@ $(printf '%b' "$ssh_keys_nix")  ];
 
   users.users."$USERNAME" = {
     isNormalUser = true;
-    extraGroups = [ "wheel" "networkmanager" ];
+    extraGroups = $user_extra_groups;
     shell = $user_shell;
     openssh.authorizedKeys.keys = [
 $(printf '%b' "$ssh_keys_nix")    ];

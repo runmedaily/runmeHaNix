@@ -55,6 +55,7 @@ in
 
   config = lib.mkIf cfg.enable {
     virtualisation.docker.enable = lib.mkDefault true;
+    environment.systemPackages = [ pkgs.docker ];
 
     systemd.tmpfiles.rules = [
       "d ${cfg.dataDir} 0755 root root -"
