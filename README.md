@@ -128,13 +128,22 @@ No GitHub login, password, token, or private key is needed.
 
 Tailscale auth-key input is hidden so it is safe for livestreams and recordings.
 
-## Test in QEMU
+## Smoke test in QEMU
 
-On a Linux/NixOS machine with QEMU:
+On macOS, install QEMU first:
 
 ```bash
+brew install qemu
+```
+
+Then:
+
+```bash
+make download-iso
 make test-minimal
 ```
+
+See [docs/smoke-test-qemu.md](docs/smoke-test-qemu.md).
 
 ## Repo layout
 

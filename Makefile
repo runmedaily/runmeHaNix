@@ -34,15 +34,22 @@ else
 endif
 
 test-minimal: test-disk.qcow2
-	@if [ ! -d result/iso ]; then echo "No ISO found. Run make build-minimal first."; exit 1; fi
-	@if ! command -v qemu-system-x86_64 >/dev/null 2>&1; then echo "qemu-system-x86_64 not found"; exit 1; fi
+	@if ! command -v qemu-system-x86_64 >/dev/null 2>&1; then \
+		echo "qemu-system-x86_64 not found."; \
+		echo "macOS: brew install qemu"; \
+		exit 1; \
+	fi
+	@if ! ls downloads/*.iso result/iso/*.iso >/dev/null 2>&1; then \
+		echo "No ISO found. Run make download-iso first."; \
+		exit 1; \
+	fi
 	qemu-system-x86_64 \
 		$(QEMU_ACCEL) \
 		-m 8G \
 		-smp 2 \
 		$(QEMU_CPU) \
 		-boot once=d \
-		-cdrom result/iso/*.iso \
+		-cdrom $$(ls downloads/*.iso result/iso/*.iso 2>/dev/null | head -1) \
 		-drive file=test-disk.qcow2,if=virtio,format=qcow2 \
 		-net nic -net user \
 		$(QEMU_DISPLAY)
