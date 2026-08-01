@@ -1,4 +1,4 @@
-.PHONY: help build-minimal test-minimal clean write-usb build-and-write-usb public-check lock
+.PHONY: help build-minimal test-minimal clean download-iso write-usb download-and-write-usb build-and-write-usb public-check lock
 
 help:
 	@echo "runmeHaNix public ISO toolkit"
@@ -6,9 +6,11 @@ help:
 	@echo "Targets:"
 	@echo "  make public-check        - run public safety/eval checks"
 	@echo "  make lock                - generate/update flake.lock"
-	@echo "  make build-minimal       - build the bootstrap ISO"
+	@echo "  make download-iso        - download latest GitHub-built ISO"
+	@echo "  make write-usb           - write downloaded/built ISO to USB (Linux/macOS)"
+	@echo "  make download-and-write-usb - download latest ISO, then write USB"
+	@echo "  make build-minimal       - build ISO locally (Linux/NixOS or Linux builder)"
 	@echo "  make test-minimal        - boot ISO in QEMU"
-	@echo "  make write-usb           - write built ISO to USB (Linux/macOS)"
 	@echo "  make build-and-write-usb - build ISO, then write USB"
 	@echo "  make clean               - remove build/test artifacts"
 
@@ -48,8 +50,13 @@ test-minimal: test-disk.qcow2
 test-disk.qcow2:
 	qemu-img create -f qcow2 test-disk.qcow2 20G
 
+download-iso:
+	@./scripts/download-iso.sh
+
 write-usb:
 	@./scripts/write-usb.sh
+
+download-and-write-usb: download-iso write-usb
 
 build-and-write-usb: build-minimal write-usb
 
@@ -66,6 +73,7 @@ public-check:
 	@echo "==> Bash syntax"
 	@bash -n installer/install.sh
 	@bash -n scripts/write-usb.sh
+	@bash -n scripts/download-iso.sh
 	@echo "==> Nix flake show"
 	@nix flake show --allow-import-from-derivation >/dev/null
 	@echo "==> ISO filename eval"

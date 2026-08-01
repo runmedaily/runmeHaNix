@@ -1,29 +1,49 @@
 # Quickstart
 
+## Mac or Linux: easiest path
+
 ```bash
 git clone https://github.com/runmedaily/runmeHaNix
 cd runmeHaNix
-make public-check
+make download-and-write-usb
 ```
 
-Build options:
+That downloads the latest GitHub-built ISO and launches the safe USB writer.
 
-- Linux/NixOS: run `make build-minimal`.
-- macOS: use GitHub Actions → "Build ISO" → Run workflow, unless you have a
-  configured Linux builder.
-
-After you have an ISO, run:
+## If you only want the ISO
 
 ```bash
+make download-iso
+```
+
+The ISO is saved to:
+
+```text
+downloads/runmeHaNix-latest.iso
+```
+
+## If you are on Linux/NixOS and want to build yourself
+
+```bash
+make public-check
+make build-minimal
 make write-usb
 ```
 
-Boot the USB and follow the prompts.
+## Install
 
-Recommended SSH key setup before install:
+Boot the USB and follow prompts.
 
-1. Add your SSH public key to GitHub.
-2. In the installer, choose GitHub username lookup.
-3. Enter your GitHub username.
+SSH key options:
 
-Tailscale is optional. If you paste an auth key, input is hidden.
+- paste public key
+- GitHub username lookup
+- file import
+
+Optional modules during install:
+
+- Home Assistant
+- Node-RED
+- Homebridge
+- Avahi/mDNS
+- shell environment

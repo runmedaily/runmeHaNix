@@ -26,20 +26,31 @@ The ISO contains **no baked secrets**:
 
 During install, you add your own SSH public key and optionally your own Tailscale auth key.
 
-## Fastest path: download the ISO
+## Fastest path
 
-Open:
+Mac or Linux:
 
-https://github.com/runmedaily/runmeHaNix/actions/workflows/build-iso.yml
+```bash
+git clone https://github.com/runmedaily/runmeHaNix
+cd runmeHaNix
+make download-and-write-usb
+```
 
-Then:
+That downloads the latest GitHub-built ISO and launches the safe USB writer.
 
-1. Open the latest successful **Build ISO** run.
-2. Download the artifact named `runmeHaNix-iso`.
-3. Unzip it.
-4. Write the `.iso` to USB.
+If you only want the ISO:
 
-The current artifact is large, about 1.4 GB.
+```bash
+make download-iso
+```
+
+The ISO is saved to:
+
+```text
+downloads/runmeHaNix-latest.iso
+```
+
+The current ISO is large, about 1.4 GB.
 
 ## Build it yourself
 
@@ -60,7 +71,7 @@ cd runmeHaNix
 make public-check
 ```
 
-Then use GitHub Actions to build the ISO, unless your Mac has a configured Linux builder.
+Or just use `make download-iso` to fetch the latest GitHub-built ISO.
 
 ## Write USB
 

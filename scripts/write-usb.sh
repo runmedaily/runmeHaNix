@@ -9,9 +9,12 @@ ok() { echo -e "${GREEN}[OK]${NC} $*"; }
 err() { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-ISO="$(find "$ROOT/result/iso" -maxdepth 1 -name '*.iso' 2>/dev/null | head -1 || true)"
+ISO="${ISO_PATH:-}"
 if [[ -z "$ISO" ]]; then
-  err "No ISO found. Run: make build-minimal"
+  ISO="$(find "$ROOT/downloads" "$ROOT/result/iso" -maxdepth 1 -name '*.iso' 2>/dev/null | head -1 || true)"
+fi
+if [[ -z "$ISO" ]]; then
+  err "No ISO found. Run: make download-iso"
   exit 1
 fi
 
