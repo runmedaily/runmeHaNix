@@ -450,7 +450,7 @@ generate_config() {
   local module_imports=""
   local module_enables=""
   local user_shell="pkgs.bash"
-  local user_extra_groups='[ "wheel" "networkmanager" ]'
+  local user_extra_groups='[ "wheel" "networkmanager" "docker" ]'
   local needs_docker=false
   local module
   for module in "${SELECTED_MODULES[@]}"; do
@@ -475,10 +475,6 @@ generate_config() {
         ;;
     esac
   done
-
-  if [[ "$needs_docker" == true ]]; then
-    user_extra_groups='[ "wheel" "networkmanager" "docker" ]'
-  fi
 
   local tailscale_auth_block=""
   if [[ -n "$TS_AUTHKEY" ]]; then
@@ -559,7 +555,7 @@ $boot_config
     ];
   };
 
-  environment.systemPackages = with pkgs; [ git curl htop vim ];
+  environment.systemPackages = with pkgs; [ git curl htop vim docker ];
 
   services.openssh = {
     enable = true;

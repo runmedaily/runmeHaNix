@@ -19,7 +19,7 @@ info "Downloading latest runmeHaNix ISO..."
 info "$URL"
 
 if command -v curl >/dev/null 2>&1; then
-  curl -L --fail --progress-bar -o "$ISO.tmp" "$URL"
+  curl -L --fail --continue-at - --progress-bar -o "$ISO.tmp" "$URL"
 elif command -v wget >/dev/null 2>&1; then
   wget -O "$ISO.tmp" "$URL"
 else
