@@ -23,6 +23,7 @@ USERNAME="hanix-user"
 SWAP_SIZE="4"
 SSH_KEYS=()
 TS_AUTHKEY=""
+SELECTED_MODULES=()
 
 log_info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
 log_success() { echo -e "${GREEN}[OK]${NC} $1"; }
@@ -308,6 +309,71 @@ collect_tailscale_auth() {
   fi
 }
 
+
+select_modules() {
+  section_header "Optional Modules"
+  echo "Choose which public modules this machine should build/install during NixOS install."
+  echo "The ISO stays minimal; selected modules are fetched from github:runmedaily/runmeHaNix."
+  echo ""
+
+  SELECTED_MODULES=()
+  local options=(
+    "home-assistant|Home Assistant container and HACS/Node-RED companion seeding"
+    "node-red|Node-RED container with Home Assistant websocket nodes"
+    "homebridge|Homebridge container for HomeKit bridges"
+    "avahi|Avahi/mDNS for HomeKit and service discovery"
+    "shell-environment|ZSH, starship, and useful terminal tools"
+  )
+
+  if command -v fzf >/dev/null 2>&1; then
+    local display=()
+    local entry name desc selected line
+    for entry in "${options[@]}"; do
+      name="${entry%%|*}"
+      desc="${entry#*|}"
+      display+=("$name  -  $desc")
+    done
+    selected=$(printf '%s
+' "${display[@]}" | \
+      fzf -m --prompt="TAB to select modules, ENTER to confirm (ESC for none): " \
+        --height=10 --reverse --no-mouse) || true
+    if [[ -n "$selected" ]]; then
+      while IFS= read -r line; do
+        SELECTED_MODULES+=("${line%%  -*}")
+      done <<< "$selected"
+    fi
+  else
+    local entry name desc answer
+    for entry in "${options[@]}"; do
+      name="${entry%%|*}"
+      desc="${entry#*|}"
+      echo -en "${CYAN}Install ${BOLD}$name${NC}${CYAN}? ${desc} [y/N]: ${NC}"
+      read -r answer
+      if [[ "$answer" =~ ^[Yy]$ ]]; then
+        SELECTED_MODULES+=("$name")
+      fi
+    done
+  fi
+
+  # Helpful dependency hint: Homebridge/Home Assistant discovery generally wants Avahi.
+  local wants_avahi=false has_avahi=false module
+  for module in "${SELECTED_MODULES[@]}"; do
+    [[ "$module" == "home-assistant" || "$module" == "homebridge" ]] && wants_avahi=true
+    [[ "$module" == "avahi" ]] && has_avahi=true
+  done
+  if [[ "$wants_avahi" == true && "$has_avahi" == false ]]; then
+    if confirm "Add avahi/mDNS too? Recommended for HomeKit discovery."; then
+      SELECTED_MODULES+=("avahi")
+    fi
+  fi
+
+  if ((${#SELECTED_MODULES[@]} == 0)); then
+    log_info "No optional modules selected; installing bootstrap base only"
+  else
+    log_success "Selected modules: ${SELECTED_MODULES[*]}"
+  fi
+}
+
 release_disk() {
   log_info "Releasing existing partitions on $DISK..."
   swapoff "${DISK}"* 2>/dev/null || true
@@ -372,12 +438,30 @@ mount_partitions() {
 }
 
 generate_config() {
-  log_info "Generating NixOS configuration..."
+  log_info "Generating NixOS flake configuration..."
   nixos-generate-config --root "$MOUNT_POINT"
 
   local ssh_keys_nix=""
   for key in "${SSH_KEYS[@]}"; do
     ssh_keys_nix+="      \"$key\"\n"
+  done
+
+  local module_imports=""
+  local module_enables=""
+  local user_shell="pkgs.bash"
+  local module
+  for module in "${SELECTED_MODULES[@]}"; do
+    module_imports+="        runmeHaNix.nixosModules.${module}\n"
+    case "$module" in
+      home-assistant) module_enables+="  services.runme.home-assistant.enable = true;\n" ;;
+      node-red) module_enables+="  services.runme.node-red.enable = true;\n" ;;
+      homebridge) module_enables+="  services.runme.homebridge.enable = true;\n" ;;
+      avahi) module_enables+="  services.runme.avahi.enable = true;\n" ;;
+      shell-environment)
+        module_enables+="  services.runme.shell.enable = true;\n"
+        user_shell="pkgs.zsh"
+        ;;
+    esac
   done
 
   local tailscale_auth_block=""
@@ -410,12 +494,34 @@ TAILSCALEEOF
   boot.loader.grub.device = \"$DISK\";"
   fi
 
-  cat > "$MOUNT_POINT$CONFIG_DIR/configuration.nix" <<NIXEOF
-# Hanix bootstrap config — enough to get on the network and accept SSH.
+  cat > "$MOUNT_POINT$CONFIG_DIR/flake.nix" <<FLAKEEOF
+{
+  description = "$TARGET_HOSTNAME Hanix system";
+
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
+    runmeHaNix = {
+      url = "github:runmedaily/runmeHaNix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+  };
+
+  outputs = { nixpkgs, runmeHaNix, ... }: {
+    nixosConfigurations.default = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        ./hardware-configuration.nix
+        ./local.nix
+$(printf '%b' "$module_imports")      ];
+    };
+  };
+}
+FLAKEEOF
+
+  cat > "$MOUNT_POINT$CONFIG_DIR/local.nix" <<NIXEOF
+# Hanix generated config.
 { config, pkgs, ... }:
 {
-  imports = [ ./hardware-configuration.nix ];
-
 $boot_config
 
   networking.hostName = "$TARGET_HOSTNAME";
@@ -439,13 +545,14 @@ $boot_config
 
   services.tailscale.enable = true;
 $tailscale_auth_block
+$(printf '%b' "$module_enables")
   users.users.root.openssh.authorizedKeys.keys = [
 $(printf '%b' "$ssh_keys_nix")  ];
 
   users.users."$USERNAME" = {
     isNormalUser = true;
     extraGroups = [ "wheel" "networkmanager" ];
-    shell = pkgs.bash;
+    shell = $user_shell;
     openssh.authorizedKeys.keys = [
 $(printf '%b' "$ssh_keys_nix")    ];
   };
@@ -459,15 +566,22 @@ $(printf '%b' "$ssh_keys_nix")    ];
   system.stateVersion = "25.11";
 }
 NIXEOF
-  log_success "Configuration generated"
+
+  log_success "Flake configuration generated"
 }
 
 run_installation() {
   wait_for_internet
-  log_info "Installing NixOS. This can take a while..."
+  log_info "Installing NixOS from generated flake. This can take a while..."
   export TMPDIR="$MOUNT_POINT/tmp"
   mkdir -p "$TMPDIR"
-  nixos-install --root "$MOUNT_POINT" --no-root-passwd
+
+  log_info "Resolving public flake inputs..."
+  nix flake lock "$MOUNT_POINT$CONFIG_DIR"
+
+  log_info "Running nixos-install..."
+  nixos-install --root "$MOUNT_POINT" --flake "$MOUNT_POINT$CONFIG_DIR#default" --no-root-passwd
+
   rm -rf "$MOUNT_POINT/tmp"
   unset TMPDIR
   log_success "Installation complete"
@@ -506,6 +620,7 @@ main() {
   get_host_info
   collect_ssh_keys
   collect_tailscale_auth
+  select_modules
 
   show_banner
   echo -e "${BOLD}Installation Summary:${NC}"
@@ -519,6 +634,11 @@ main() {
     echo -e "  Tailscale: ${GREEN}auto-auth on boot${NC}"
   else
     echo -e "  Tailscale: skipped/manual later"
+  fi
+  if ((${#SELECTED_MODULES[@]} == 0)); then
+    echo -e "  Modules:   bootstrap base only"
+  else
+    echo -e "  Modules:   ${SELECTED_MODULES[*]}"
   fi
   if check_uefi; then echo "  Boot:      UEFI"; else echo "  Boot:      BIOS/Legacy"; fi
   echo "─────────────────────────────────────"

@@ -85,6 +85,19 @@ The installer asks for:
 - username, default `hanix-user`
 - SSH public key source
 - optional Tailscale auth key
+- optional modules to install from the public repo
+
+Optional modules are not baked as service deployments into the ISO. During
+install, the target machine writes a flake pointing at `github:runmedaily/runmeHaNix`
+and builds only what you selected.
+
+Available module choices:
+
+- Home Assistant
+- Node-RED
+- Homebridge
+- Avahi / mDNS
+- shell environment
 
 Recommended SSH key path:
 
