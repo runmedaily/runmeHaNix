@@ -12,7 +12,7 @@ A public-safe NixOS bootstrap ISO for a Home Assistant stack:
 
 Built for livestream testing and public feedback.
 
-Special thanks to **[Tonarchy](https://github.com/Tonarchy) / tony_btw on YouTube** for inspiration.
+Special thanks to **[Tony, btw.](https://github.com/tonybanters)** and **[Tonarchy](https://github.com/tonybanters/tonarchy)** for inspiration.
 
 ## Safety promise
 

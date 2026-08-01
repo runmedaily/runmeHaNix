@@ -94,7 +94,7 @@ show_banner() {
  |_| |_|\__,_|_| |_|_/_/\_\ 
 
  Public NixOS Bootstrap Installer
- Inspired by Tonarchy / tony_btw on YouTube
+ Inspired by Tony, btw. and Tonarchy
 EOF
   echo -e "${NC}"
 }
@@ -629,7 +629,7 @@ main() {
   setup_console
   show_banner
   echo -e "  ${BOLD}Public-safe bootstrap installer${NC} — no baked keys or secrets."
-  echo -e "  Special thanks: Tonarchy / tony_btw on YouTube for inspiration.\n"
+  echo -e "  Special thanks: Tony, btw. and Tonarchy for inspiration.\n"
 
   if check_uefi; then log_info "Boot mode: UEFI"; else log_info "Boot mode: BIOS/Legacy"; fi
   echo ""
