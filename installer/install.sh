@@ -531,8 +531,18 @@ $boot_config
   networking.firewall.allowedTCPPorts = [ 22 ];
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
 
-  nix.settings.experimental-features = [ "nix-command" "flakes" ];
-  nix.settings.trusted-users = [ "root" "$USERNAME" ];
+  nix.settings = {
+    experimental-features = [ "nix-command" "flakes" ];
+    trusted-users = [ "root" "$USERNAME" ];
+    substituters = [
+      "https://cache.nixos.org"
+      "https://nix-community.cachix.org"
+    ];
+    trusted-public-keys = [
+      "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
+      "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
+    ];
+  };
 
   environment.systemPackages = with pkgs; [ git curl htop vim ];
 
@@ -575,13 +585,19 @@ run_installation() {
   wait_for_internet
   log_info "Installing NixOS from generated flake. This can take a while..."
   export TMPDIR="$MOUNT_POINT/tmp"
-  mkdir -p "$TMPDIR"
+  local build_dir="$MOUNT_POINT/tmp/nix-build"
+  mkdir -p "$TMPDIR" "$build_dir"
 
   log_info "Resolving public flake inputs..."
-  nix flake lock "$MOUNT_POINT$CONFIG_DIR"
+  nix --option build-dir "$build_dir" flake lock "$MOUNT_POINT$CONFIG_DIR"
 
-  log_info "Running nixos-install..."
-  nixos-install --root "$MOUNT_POINT" --flake "$MOUNT_POINT$CONFIG_DIR#default" --no-root-passwd
+  log_info "Running nixos-install with disk-backed build dir..."
+  nixos-install \
+    --root "$MOUNT_POINT" \
+    --flake "$MOUNT_POINT$CONFIG_DIR#default" \
+    --no-root-passwd \
+    --option build-dir "$build_dir" \
+    --option substituters "https://cache.nixos.org https://nix-community.cachix.org"
 
   rm -rf "$MOUNT_POINT/tmp"
   unset TMPDIR
