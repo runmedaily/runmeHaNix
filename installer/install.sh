@@ -595,22 +595,36 @@ NIXEOF
 run_installation() {
   wait_for_internet
   log_info "Installing NixOS from generated flake. This can take a while..."
-  export TMPDIR="$MOUNT_POINT/tmp"
+
+  # Match the proven private runmeNix installer strategy:
+  # build the system closure into the target /mnt store first, then install
+  # that exact system path. This avoids nixos-install --flake edge cases and
+  # keeps temp/build data on the target disk instead of the live ISO tmpfs.
+  local tmp_flake="$MOUNT_POINT/tmp/nixos-flake-config"
   local build_dir="$MOUNT_POINT/tmp/nix-build"
-  mkdir -p "$TMPDIR" "$build_dir"
+  rm -rf "$tmp_flake"
+  mkdir -p "$MOUNT_POINT/tmp" "$build_dir"
+  cp -r "$MOUNT_POINT$CONFIG_DIR" "$tmp_flake"
+
+  export TMPDIR="$MOUNT_POINT/tmp"
 
   log_info "Resolving public flake inputs..."
-  nix --option build-dir "$build_dir" flake lock "$MOUNT_POINT$CONFIG_DIR"
+  nix --option build-dir "$build_dir" flake lock "path:$tmp_flake"
 
-  log_info "Running nixos-install with disk-backed build dir..."
-  nixos-install \
-    --root "$MOUNT_POINT" \
-    --flake "$MOUNT_POINT$CONFIG_DIR#default" \
-    --no-root-passwd \
+  log_info "Building system closure into target store..."
+  local system_path
+  system_path=$(nix build \
+    --store "$MOUNT_POINT" \
     --option build-dir "$build_dir" \
-    --option substituters "https://cache.nixos.org https://nix-community.cachix.org"
+    --option substituters "https://cache.nixos.org https://nix-community.cachix.org" \
+    "path:$tmp_flake#nixosConfigurations.default.config.system.build.toplevel" \
+    --no-link \
+    --print-out-paths)
 
-  rm -rf "$MOUNT_POINT/tmp"
+  log_info "Installing system to disk..."
+  nixos-install --root "$MOUNT_POINT" --system "$system_path" --no-root-passwd
+
+  rm -rf "$tmp_flake" "$MOUNT_POINT/tmp"
   unset TMPDIR
   log_success "Installation complete"
 }
