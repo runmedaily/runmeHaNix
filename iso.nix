@@ -2,7 +2,7 @@
 { pkgs, lib, ... }:
 
 {
-  system.stateVersion = "25.11";
+  system.stateVersion = "26.05";
 
   # Avoid unsupported/broken filesystems in the live installer image.
   boot.supportedFilesystems = lib.mkForce [ "btrfs" "reiserfs" "vfat" "f2fs" "xfs" "ntfs" "cifs" "ext4" ];

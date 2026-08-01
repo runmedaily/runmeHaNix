@@ -511,7 +511,7 @@ TAILSCALEEOF
   description = "$TARGET_HOSTNAME Hanix system";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
     runmeHaNix = {
       url = "github:runmedaily/runmeHaNix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -585,7 +585,7 @@ $(printf '%b' "$ssh_keys_nix")    ];
   i18n.defaultLocale = "en_US.UTF-8";
   console.keyMap = "us";
 
-  system.stateVersion = "25.11";
+  system.stateVersion = "26.05";
 }
 NIXEOF
 
