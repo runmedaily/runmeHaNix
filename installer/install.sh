@@ -135,7 +135,13 @@ show_key_fingerprints() {
 select_disk() {
   section_header "Disk Selection"
   local disks
-  disks=$(lsblk -dpno NAME,SIZE,MODEL | grep -E "^/dev/(sd|nvme|vd)" || true)
+  # Include common physical, virtual, and Xen block devices:
+  #   sd*      SATA/SCSI/USB/VirtIO-scsi
+  #   nvme*    NVMe
+  #   vd*      VirtIO block
+  #   xvd*     Xen paravirtual disks, common in Xen Orchestra/XCP-ng
+  #   mmcblk*  eMMC/SD media
+  disks=$(lsblk -dpno NAME,SIZE,MODEL | grep -E "^/dev/(sd|nvme|vd|xvd|mmcblk)" || true)
   if [[ -z "$disks" ]]; then
     log_error "No suitable disks found"
     exit 1
