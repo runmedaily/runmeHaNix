@@ -17,7 +17,7 @@ let cfg = config.services.runme.shell; in
         theme = "robbyrussell";
       };
       interactiveShellInit = ''
-        neofetch
+        fastfetch
         # OSC 52 remote clipboard — pipe output to yank to copy to local clipboard over SSH
         # Usage: echo "hello" | yank    or    cat file.log | yank
         yank() {
@@ -48,7 +48,7 @@ let cfg = config.services.runme.shell; in
       wget
       htop
       btop
-      neofetch
+      fastfetch
       unzip
       eza
       bat

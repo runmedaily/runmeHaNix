@@ -89,6 +89,8 @@ public-check:
 	@test "$$(nix eval .#nixosConfigurations.demo-hanix.config.services.runme.home-assistant.enable --json)" = true
 	@test "$$(nix eval .#nixosConfigurations.demo-hanix.config.services.runme.node-red.enable --json)" = true
 	@test "$$(nix eval .#nixosConfigurations.demo-hanix.config.services.runme.homebridge.enable --json)" = true
+	@echo "==> Demo system toplevel eval"
+	@nix eval .#nixosConfigurations.demo-hanix.config.system.build.toplevel.drvPath --raw >/dev/null
 	@echo "public-check passed"
 
 clean:

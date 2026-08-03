@@ -39,6 +39,7 @@
         modules = publicModules ++ [
           ({ pkgs, ... }: {
             networking.hostName = "demo-hanix";
+            time.timeZone = "UTC";
 
             boot.loader.grub.enable = true;
             boot.loader.grub.device = "nodev";
