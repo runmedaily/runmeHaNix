@@ -474,6 +474,45 @@ release_disk() {
   sleep 1
 }
 
+prepare_new_partitions() {
+  local pp attempt part
+  pp=$(part_prefix)
+
+  partprobe "$DISK"
+  if command -v udevadm >/dev/null 2>&1; then
+    udevadm settle
+  fi
+
+  # Wait until the kernel has created all three new partition devices.
+  for attempt in {1..10}; do
+    if [[ -b "${pp}1" && -b "${pp}2" && -b "${pp}3" ]]; then
+      break
+    fi
+    sleep 1
+  done
+  if [[ ! -b "${pp}1" || ! -b "${pp}2" || ! -b "${pp}3" ]]; then
+    log_error "New partition devices did not appear for $DISK"
+    exit 1
+  fi
+
+  # Repartitioning does not erase filesystem signatures inside the old
+  # partition ranges. Remove them so blkid/mount cannot mistake ext4 for FAT.
+  for part in "${pp}1" "${pp}2" "${pp}3"; do
+    wipefs -af "$part"
+  done
+}
+
+verify_filesystem() {
+  local device="$1"
+  local expected="$2"
+  local actual
+  actual=$(blkid -c /dev/null -p -s TYPE -o value "$device" 2>/dev/null || true)
+  if [[ "$actual" != "$expected" ]]; then
+    log_error "Expected $device to contain $expected, detected: ${actual:-unknown}"
+    exit 1
+  fi
+}
+
 partition_disk_uefi() {
   log_info "Partitioning (UEFI)..."
   release_disk
@@ -484,14 +523,15 @@ partition_disk_uefi() {
   local swap_end=$((1025 + SWAP_SIZE * 1024))
   parted -s "$DISK" mkpart primary linux-swap 1025MiB "${swap_end}MiB"
   parted -s "$DISK" mkpart primary ext4 "${swap_end}MiB" 100%
-  sleep 2
-  partprobe "$DISK"
-  sleep 1
+  prepare_new_partitions
   local pp
   pp=$(part_prefix)
   mkfs.fat -F32 "${pp}1"
   mkswap "${pp}2"
   mkfs.ext4 -F "${pp}3"
+  verify_filesystem "${pp}1" vfat
+  verify_filesystem "${pp}2" swap
+  verify_filesystem "${pp}3" ext4
 }
 
 partition_disk_bios() {
@@ -504,23 +544,24 @@ partition_disk_bios() {
   local swap_end=$((2 + SWAP_SIZE * 1024))
   parted -s "$DISK" mkpart primary linux-swap 2MiB "${swap_end}MiB"
   parted -s "$DISK" mkpart primary ext4 "${swap_end}MiB" 100%
-  sleep 2
-  partprobe "$DISK"
-  sleep 1
+  prepare_new_partitions
   local pp
   pp=$(part_prefix)
   mkswap "${pp}2"
   mkfs.ext4 -F "${pp}3"
+  verify_filesystem "${pp}2" swap
+  verify_filesystem "${pp}3" ext4
 }
 
 mount_partitions() {
   log_info "Mounting..."
   local pp
   pp=$(part_prefix)
-  mount "${pp}3" "$MOUNT_POINT"
+  mkdir -p "$MOUNT_POINT"
+  mount -t ext4 "${pp}3" "$MOUNT_POINT"
   if check_uefi; then
     mkdir -p "$MOUNT_POINT/boot"
-    mount "${pp}1" "$MOUNT_POINT/boot"
+    mount -t vfat "${pp}1" "$MOUNT_POINT/boot"
   fi
   swapon "${pp}2"
 }
