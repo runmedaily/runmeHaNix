@@ -24,6 +24,7 @@ SWAP_SIZE="4"
 SSH_KEYS=()
 TS_AUTHKEY=""
 SELECTED_MODULES=()
+MENU_SELECTION=0
 
 log_info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
 log_success() { echo -e "${GREEN}[OK]${NC} $1"; }
@@ -134,36 +135,122 @@ show_key_fingerprints() {
   rm -f "$tmp"
 }
 
+arrow_select() {
+  local title="$1"
+  local default_index="$2"
+  shift 2
+  local -a options=("$@")
+  local selected="$default_index"
+  local key rest i
+
+  while true; do
+    section_header "$title"
+    echo "Use the up/down arrow keys, then press Enter."
+    echo ""
+    for i in "${!options[@]}"; do
+      if ((i == selected)); then
+        echo -e "  ${GREEN}${BOLD}> ${options[$i]}${NC}"
+      else
+        echo "    ${options[$i]}"
+      fi
+    done
+
+    IFS= read -rsn1 key </dev/tty
+    case "$key" in
+      "")
+        MENU_SELECTION="$selected"
+        return 0
+        ;;
+      $'\x1b')
+        rest=""
+        IFS= read -rsn2 -t 0.2 rest </dev/tty || true
+        case "$rest" in
+          "[A") selected=$(((selected - 1 + ${#options[@]}) % ${#options[@]})) ;;
+          "[B") selected=$(((selected + 1) % ${#options[@]})) ;;
+        esac
+        ;;
+      k|K) selected=$(((selected - 1 + ${#options[@]}) % ${#options[@]})) ;;
+      j|J) selected=$(((selected + 1) % ${#options[@]})) ;;
+    esac
+  done
+}
+
 select_disk() {
-  section_header "Disk Selection"
-  local disks
+  local -a disk_rows=()
+  local -a disk_paths=()
+  local -a disk_labels=()
+  local row path removable transport marker i
+  local recommended=-1
+  local live_source=""
+  local live_parent=""
+  local live_disk=""
+
   # Include common physical, virtual, and Xen block devices:
   #   sd*      SATA/SCSI/USB/VirtIO-scsi
   #   nvme*    NVMe
   #   vd*      VirtIO block
   #   xvd*     Xen paravirtual disks, common in Xen Orchestra/XCP-ng
   #   mmcblk*  eMMC/SD media
-  disks=$(lsblk -dpno NAME,SIZE,MODEL | grep -E "^/dev/(sd|nvme|vd|xvd|mmcblk)" || true)
-  if [[ -z "$disks" ]]; then
+  mapfile -t disk_rows < <(lsblk -dpno NAME,SIZE,MODEL | grep -E "^/dev/(sd|nvme|vd|xvd|mmcblk)" || true)
+  if ((${#disk_rows[@]} == 0)); then
     log_error "No suitable disks found"
     exit 1
   fi
 
-  echo -e "${BOLD}Available disks:${NC}"
-  echo "$disks"
-  echo ""
-
-  if command -v fzf >/dev/null 2>&1; then
-    DISK=$(echo "$disks" | fzf --prompt="Select disk: " --height=8 --reverse --no-mouse | awk '{print $1}') || true
-  else
-    echo -en "${CYAN}Enter disk path (e.g. /dev/sda): ${NC}"
-    read -r DISK
+  # Identify the device containing the live installer so it is never mistaken
+  # for the installation target.
+  live_source=$(findmnt -n -o SOURCE /iso 2>/dev/null || true)
+  if [[ -n "$live_source" ]]; then
+    live_source=$(readlink -f "$live_source" 2>/dev/null || printf '%s' "$live_source")
+    live_parent=$(lsblk -no PKNAME "$live_source" 2>/dev/null | head -n 1 || true)
+    if [[ -n "$live_parent" ]]; then
+      live_disk="/dev/$live_parent"
+    else
+      live_disk="$live_source"
+    fi
   fi
 
-  if [[ -z "$DISK" ]]; then
-    log_error "No disk selected"
-    exit 1
+  for row in "${disk_rows[@]}"; do
+    path=$(awk '{print $1}' <<< "$row")
+    removable=$(lsblk -dnro RM "$path" 2>/dev/null || echo 0)
+    transport=$(lsblk -dnro TRAN "$path" 2>/dev/null || true)
+    marker=""
+
+    if [[ "$path" == "$live_disk" ]]; then
+      marker="  [installer USB — do not select]"
+    elif [[ "$removable" == "1" || "$transport" == "usb" ]]; then
+      marker="  [removable]"
+    elif ((recommended < 0)); then
+      recommended=${#disk_paths[@]}
+    fi
+
+    disk_paths+=("$path")
+    disk_labels+=("$row$marker")
+  done
+
+  # If every possible target is removable, recommend the first disk that is
+  # not the live installer media.
+  if ((recommended < 0)); then
+    for i in "${!disk_paths[@]}"; do
+      if [[ "${disk_paths[$i]}" != "$live_disk" ]]; then
+        recommended=$i
+        break
+      fi
+    done
   fi
+  ((recommended >= 0)) || recommended=0
+  disk_labels[$recommended]="${disk_labels[$recommended]}  [recommended]"
+
+  while true; do
+    arrow_select "Disk Selection" "$recommended" "${disk_labels[@]}"
+    DISK="${disk_paths[$MENU_SELECTION]}"
+    if [[ "$DISK" == "$live_disk" ]]; then
+      log_error "Refusing to select the live installer device: $DISK"
+      sleep 2
+    else
+      break
+    fi
+  done
 
   section_header "Confirm Disk"
   echo -e "${RED}${BOLD}WARNING:${NC} This will ${RED}ERASE ALL DATA${NC} on ${BOLD}$DISK${NC}"
