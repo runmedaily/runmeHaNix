@@ -25,11 +25,25 @@ SSH_KEYS=()
 TS_AUTHKEY=""
 SELECTED_MODULES=()
 MENU_SELECTION=0
+INSTALL_START_SECONDS=${SECONDS:-0}
 
 log_info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
 log_success() { echo -e "${GREEN}[OK]${NC} $1"; }
 log_warn()    { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error()   { echo -e "${RED}[ERROR]${NC} $1"; }
+
+format_duration() {
+  local total_seconds="$1"
+  local hours=$((total_seconds / 3600))
+  local minutes=$(((total_seconds % 3600) / 60))
+  local seconds=$((total_seconds % 60))
+
+  if ((hours > 0)); then
+    printf '%dh %02dm %02ds' "$hours" "$minutes" "$seconds"
+  else
+    printf '%dm %02ds' "$minutes" "$seconds"
+  fi
+}
 
 confirm() {
   local prompt="${1:-Continue?}"
@@ -835,7 +849,9 @@ main() {
   set_user_password
 
   show_banner
+  local elapsed_seconds=$((SECONDS - INSTALL_START_SECONDS))
   echo -e "${GREEN}${BOLD}Installation complete.${NC}"
+  echo -e "Elapsed time: ${CYAN}$(format_duration "$elapsed_seconds")${NC}"
   echo ""
   echo "After reboot, SSH using your provided key:"
   echo -e "  ${CYAN}ssh $USERNAME@$TARGET_HOSTNAME${NC}"
