@@ -730,6 +730,11 @@ run_installation() {
   # keeps temp/build data on the target disk instead of the live ISO tmpfs.
   local tmp_flake="$MOUNT_POINT/tmp/nixos-flake-config"
   local build_dir="$MOUNT_POINT/tmp/nix-build"
+  local -a nix_options=(
+    --extra-experimental-features "nix-command flakes"
+    --option substituters "https://cache.nixos.org https://nix-community.cachix.org"
+    --option trusted-public-keys "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
+  )
   rm -rf "$tmp_flake"
   mkdir -p "$MOUNT_POINT/tmp" "$build_dir"
   cp -r "$MOUNT_POINT$CONFIG_DIR" "$tmp_flake"
@@ -737,14 +742,13 @@ run_installation() {
   export TMPDIR="$MOUNT_POINT/tmp"
 
   log_info "Resolving public flake inputs..."
-  nix --option build-dir "$build_dir" flake lock "path:$tmp_flake"
+  nix "${nix_options[@]}" --option build-dir "$build_dir" flake lock "path:$tmp_flake"
 
   log_info "Building system closure into target store..."
   local system_path
-  system_path=$(nix build \
+  system_path=$(nix "${nix_options[@]}" build \
     --store "$MOUNT_POINT" \
     --option build-dir "$build_dir" \
-    --option substituters "https://cache.nixos.org https://nix-community.cachix.org" \
     "path:$tmp_flake#nixosConfigurations.default.config.system.build.toplevel" \
     --no-link \
     --print-out-paths)
